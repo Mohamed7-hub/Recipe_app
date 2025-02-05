@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Add these permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -32,6 +36,20 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" />
+
+        <!-- Add Recipe -->
+        <activity android:name=".AddRecipeActivity"
+            android:exported="false"
+            />
+
+        <!-- Add EditProfileActivity -->
+        <activity
+            android:name=".EditProfileActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".RecipeDetailActivity"
+            android:exported="false"/>
 
     </application>
 </manifest>

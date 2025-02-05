@@ -1,8 +1,8 @@
 package com.example.shoping;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -11,7 +11,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -19,13 +18,21 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserProfileChangeRequest;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class SignUp extends AppCompatActivity {
+    private static final String TAG = "SignUp";
+
     private EditText nameEditText, emailEditText, passwordEditText;
     private Button registerButton;
     private TextView signInLink;
     private ImageView backButton;
     private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,47 +41,29 @@ public class SignUp extends AppCompatActivity {
 
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
+        // Initialize Firestore
+        db = FirebaseFirestore.getInstance();
 
         // Initialize views
+        initializeViews();
+
+        // Set click listeners
+        setClickListeners();
+    }
+
+    private void initializeViews() {
         nameEditText = findViewById(R.id.nameEditText);
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         registerButton = findViewById(R.id.registerButton);
         signInLink = findViewById(R.id.signInLink);
         backButton = findViewById(R.id.backButton);
+    }
 
-        // Handle Register button click
-        registerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                registerUser();
-            }
-        });
-
-        // Handle Sign In link click
-        signInLink.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Navigate to SignInActivity
-                Intent intent = new Intent(SignUp.this, SignIn.class);
-                startActivity(intent);
-                // Don't finish this activity
-            }
-        });
-
-        // Handle back button click
-        backButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Instead of finish(), check if we can go back
-                if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-                    getSupportFragmentManager().popBackStack();
-                } else {
-                    // If no fragments, go to previous activity
-                    onBackPressed();
-                }
-            }
-        });
+    private void setClickListeners() {
+        registerButton.setOnClickListener(v -> registerUser());
+        signInLink.setOnClickListener(v -> navigateToSignIn());
+        backButton.setOnClickListener(v -> onBackPressed());
     }
 
     private void registerUser() {
@@ -92,40 +81,69 @@ public class SignUp extends AppCompatActivity {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
-                            // Sign up success, update UI with the signed-in user's information
                             FirebaseUser user = mAuth.getCurrentUser();
-                            Toast.makeText(SignUp.this, "Registration successful", Toast.LENGTH_SHORT).show();
+                            if (user != null) {
+                                UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                                        .setDisplayName(name)
+                                        .build();
 
-                            // Navigate to SignInActivity
-                            Intent intent = new Intent(SignUp.this, SignIn.class);
-                            startActivity(intent);
-                            finish(); // Close the SignUpActivity
+                                user.updateProfile(profileUpdates)
+                                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                            @Override
+                                            public void onComplete(@NonNull Task<Void> task) {
+                                                if (task.isSuccessful()) {
+                                                    // Create user document in Firestore
+                                                    createUserDocument(user.getUid(), name, email);
+                                                } else {
+                                                    Log.w(TAG, "updateProfile:failure", task.getException());
+                                                    Toast.makeText(SignUp.this, "Failed to update profile", Toast.LENGTH_SHORT).show();
+                                                }
+                                            }
+                                        });
+                            }
                         } else {
-                            // If sign up fails, display a message to the user.
+                            Log.w(TAG, "createUserWithEmail:failure", task.getException());
                             Toast.makeText(SignUp.this, "Registration failed: " + task.getException().getMessage(),
                                     Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
     }
-    //am going to but onStart() method here
+
+    private void createUserDocument(String userId, String name, String email) {
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("fullName", name);
+        userData.put("email", email);
+
+        db.collection("users").document(userId)
+                .set(userData)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(SignUp.this, "Registration successful", Toast.LENGTH_SHORT).show();
+                    navigateToMainActivity();
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Error adding document", e);
+                    Toast.makeText(SignUp.this, "Failed to create user document: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void navigateToMainActivity() {
+        Intent intent = new Intent(SignUp.this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToSignIn() {
+        Intent intent = new Intent(SignUp.this, SignIn.class);
+        startActivity(intent);
+        // Don't finish this activity to allow back navigation
+    }
+
     @Override
     public void onBackPressed() {
-        // Check if this is the last activity in the stack
-        if (isTaskRoot()) {
-            // If it's the last activity, show a dialog to confirm exit
-            new AlertDialog.Builder(this)
-                    .setMessage("Are you sure you want to exit?")
-                    .setCancelable(false)
-                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            SignUp.super.onBackPressed();
-                        }
-                    })
-                    .setNegativeButton("No", null)
-                    .show();
-        } else {
-            super.onBackPressed();
-        }
+        super.onBackPressed();
+        // You can add any additional logic here if needed
     }
 }
+

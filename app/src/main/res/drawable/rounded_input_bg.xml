@@ -1,5 +1,5 @@
 <!-- res/drawable/rounded_input_bg.xml -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#FFFFFF"/> <!-- White background -->
-    <corners android:radius="16dp"/> <!-- Rounded corners with 16dp radius -->
+    <solid android:color="#DCDCDC"/> <!-- White background -->
+    <corners android:radius="5dp"/> <!-- Rounded corners with 16dp radius -->
     </shape>
